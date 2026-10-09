@@ -1,0 +1,4 @@
+pdfplumber>=0.11
+playwright>=1.48
+PyYAML>=6.0
+pytest>=8.0

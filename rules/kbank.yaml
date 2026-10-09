@@ -1,0 +1,67 @@
+# KBank (Kasikornbank) deposit-rate scraping rules.
+# Edit this file (not the code) when the website or PDF layout changes.
+bank: kbank
+name_th: ธนาคารกสิกรไทย
+
+listing:
+  url: https://www.kasikornbank.com/th/rate/pages/deposits.aspx
+  # CSS selector for links to the Thai deposit-rate PDFs on the listing page
+  pdf_link_selector: "a[href*='/rate/deposits/'][href$='-deposit-rates-th.pdf']"
+  # regex on the href; group 1 = DDMMYYYY (Gregorian) = effective date
+  pdf_link_regex: '/rate/deposits/(\d{8})-deposit-rates-th\.pdf$'
+  base_url: https://www.kasikornbank.com
+
+fetch:
+  # Plain curl/requests gets "Access Denied" (Akamai). Use Playwright with the
+  # full Chromium build in new-headless mode (channel=chromium). The slim
+  # chromium-headless-shell build also gets 403.
+  method: playwright
+  channel: chromium
+  locale: th-TH
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+  # Cookie banner: click the green "accept all cookies" button.
+  cookie_accept_text: ยอมรับคุกกี้ทั้งหมด
+  retries: 3
+
+raw_path: raw/kbank/{date}-th.pdf   # {date} = effective date YYYY-MM-DD
+
+pdf:
+  # pages (0-based) that hold the rate table; the rest are conditions text
+  table_pages: [0, 1, 2, 3]
+  label_max_x: 245          # words left of this are the row label
+  column_tolerance: 14      # max distance (pt) from a rate to a column centre
+  # x-centre (pt) of each customer-type column, left to right
+  columns:
+    - {x: 262, customer_type: individual}             # บุคคลธรรมดา
+    - {x: 297, customer_type: juristic_1}             # นิติบุคคล (1) companies etc.
+    - {x: 333, customer_type: juristic_2}             # นิติบุคคล (2) temples, foundations, Red Cross
+    - {x: 372, customer_type: hospital_school_gov}    # โรงพยาบาล/สถานศึกษา/หน่วยงานราชการ
+    - {x: 410, customer_type: financial_institution}  # สถาบันการเงิน
+    - {x: 441, customer_type: fund}                   # กองทุน
+    - {x: 475, customer_type: special_juristic_1}     # นิติบุคคลพิเศษ (1)
+    - {x: 510, customer_type: special_juristic_2}     # นิติบุคคลพิเศษ (2)
+    - {x: 546, customer_type: non_resident}           # ผู้มีถิ่นฐานอยู่นอกประเทศ (see condition 12)
+
+# Product = first rule whose regex matches the section heading.
+# Matching is done on a "skeleton" of the Thai text (spaces, tone marks and
+# above/below vowels removed, ำ -> า) because the PDF text layer reorders them.
+# Patterns are written in normal Thai; they get the same treatment.
+products:
+  - {id: line-bk-special-savings, match: 'เงินออมดอกพิเศษ.*LINE ?BK'}
+  - {id: line-bk, match: 'LINE ?BK'}
+  - {id: k-esavings-make, match: 'MAKE'}
+  - {id: k-epocket, match: 'K-ePocket'}
+  - {id: k-esavings, match: 'K-eSavings'}
+  - {id: k-ecurrent, match: 'K-eCurrent'}
+  - {id: current, match: 'กระแสรายวัน'}
+  - {id: basic-banking, match: 'Basic ?Banking'}
+  - {id: savings-collateral-ref, match: 'หลักประกัน'}
+  - {id: k-green-savings, match: 'K-Green'}
+  - {id: 'savings-special-{1}', match: 'ออมทรัพย์พิเศษ(\d+)'}
+  - {id: savings-special-juristic, match: 'ออมทรัพย์สำหรับนิติบุคคลพิเศษ'}
+  - {id: fixed-dated-special-juristic, match: 'ประจำประเภทระบุวัน'}
+  - {id: super-senior, match: 'ซูเปอร์'}
+  - {id: taweesap, match: 'ทวีทรัพย์'}          # monthly-installment fixed deposit
+  - {id: family-flex, match: 'ครอบครัวอุ่นใจ'}
+  - {id: fixed, match: 'ประจำ'}
+  - {id: savings, match: 'ออมทรัพย์'}
